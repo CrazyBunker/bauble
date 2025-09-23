@@ -41,22 +41,13 @@ jobs:
     - name: Build merge_events
       run: |
         make all ext=${{ matrix.ext }}
-        mkdir -p dist
 
-    - name: Compress binaries windows
-      if: ${{ matrix.os }} == 'windows-latest'
-      run: |
-          Compress-Archive -Path bin/${{ matrix.app }} -DestinationPath dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive}}
-    - name: Compress binaries
-      if: ${{ matrix.os }} != 'windows-latest'
-      run: |
-          tar -czf dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive}} bin/${{ matrix.app }}
 
     - name: Upload compressed binaries
       uses: actions/upload-artifact@v4
       with:
         name: ${{ matrix.app }}-${{ matrix.suffix }}
-        path: dist
+        path: bin
 
   release:
     needs: build
@@ -65,8 +56,8 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: bin
 
       - name: Compress binaries
         run: |
-          ls -la dist
+          ls -la bin
