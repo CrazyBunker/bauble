@@ -3,8 +3,8 @@ name: Update README from cmd directory
 on:
   push:
     branches: [ main ]
- #   paths: 
- #     - 'cmd/**'
+    paths: 
+      - 'cmd/**'
   workflow_dispatch:
 
 permissions:
