@@ -1,0 +1,81 @@
+name: Update README from cmd directory
+
+on:
+  push:
+    branches: [ main ]
+    paths: 
+      - 'cmd/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Generate README from cmd structure
+        run: |
+          # Создаем основной README с таблицей приложений
+          cat > README.md << 'EOF'
+          # Project Applications
+
+          This project contains the following applications:
+
+          | Application | Description | Documentation |
+          |-------------|-------------|---------------|
+          EOF
+
+          # Добавляем строки в таблицу для каждого приложения
+          if [ -d "cmd" ]; then
+            for app_dir in cmd/*/; do
+              if [ -d "$app_dir" ]; then
+                app_name=$(basename "$app_dir")
+                readme_file="$app_dir/README.md"
+                
+                if [ -f "$readme_file" ]; then
+                  # Извлекаем первое предложение как описание
+                  description=$(head -n 10 "$readme_file" | grep -v '^#' | grep -v '^$' | head -n 1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+                  if [ -z "$description" ]; then
+                    description="No description available"
+                  fi
+                  
+                  # Обрезаем описание если слишком длинное
+                  if [ ${#description} -gt 100 ]; then
+                    description="${description:0:100}..."
+                  fi
+                  
+                  echo "| \`$app_name\` | $description | [README]($readme_file) |" >> README.md
+                else
+                  echo "| \`$app_name\` | No documentation available | - |" >> README.md
+                fi
+              fi
+            done
+          fi
+
+          # Добавляем информацию о времени обновления
+          echo "" >> README.md
+          echo "---" >> README.md
+          echo "*Last auto-updated: $(date)*" >> README.md
+
+      - name: Commit changes if modified
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Проверяем изменения и коммитим только если есть изменения
+          if ! git diff --quiet README.md; then
+            git add README.md
+            git commit -m "docs: auto-update README.md [skip ci]"
+            git push
+            echo "README updated and pushed successfully"
+          else
+            echo "No changes to README.md"
+          fi
