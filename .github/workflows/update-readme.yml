@@ -61,22 +61,23 @@ jobs:
           fi
 
           # Добавляем информацию о времени обновления
-          echo "" >> README.md
-          echo "---" >> README.md
-          echo "*Last auto-updated: $(date)*" >> README.md
-          cat README.md
-          git diff README.md
+            echo "" >> README.md
+            echo "---" >> README.md
+            echo "*Last auto-updated: $(date)*" >> README.md
+            cat README.md
       - name: Commit changes if modified
         run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          # Проверяем изменения и коммитим только если есть изменения
-          if ! git diff --quiet README.md; then
+            git config --local user.email "action@github.com"
+            git config --local user.name "GitHub Action"
+            
+            # Добавляем файл
             git add README.md
-            git commit -m "docs: auto-update README.md [skip ci]"
-            git push
-            echo "README updated and pushed successfully"
-          else
-            echo "No changes to README.md"
-          fi
+            
+            # Проверяем есть ли изменения в staging area
+            if [ -z "$(git status --porcelain)" ]; then
+                echo "No changes to commit"
+            else
+                git commit -m "docs: auto-update README.md [skip ci]"
+                git push
+                echo "README updated and pushed successfully"
+            fi
