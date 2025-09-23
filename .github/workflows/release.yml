@@ -42,16 +42,18 @@ jobs:
       run: |
         make ${{ matrix.app }} ext=${{ matrix.ext }}
     
-    - name: Package binary
+    - name: Create distribution directory
+      run: mkdir -p dist
+
+    - name: Package binary (Linux/macOS)
+      if: matrix.os != 'windows-latest'
       run: |
-        mkdir -p dist
-        if [ "${{ matrix.os }}" == "windows-latest" ]; then
-          # Для Windows
-          Compress-Archive -Path "bin/${{ matrix.app }}${{ matrix.ext }}" -DestinationPath "dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive }}"
-        else
-          # Для Linux/macOS
-          tar -czf "dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive }}" -C "bin" "${{ matrix.app }}${{ matrix.ext }}"
-        fi
+        tar -czf "dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive }}" -C "bin" "${{ matrix.app }}${{ matrix.ext }}"
+
+    - name: Package binary (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Compress-Archive -Path "bin/${{ matrix.app }}${{ matrix.ext }}" -DestinationPath "dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive }}"
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
