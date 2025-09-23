@@ -40,7 +40,7 @@ jobs:
 
     - name: Build merge_events
       run: |
-        make all ext=${{ matrix.ext }}
+        make ${{ matrix.app }} ext=${{ matrix.ext }}
 
 
     - name: Upload compressed binaries
@@ -48,6 +48,7 @@ jobs:
       with:
         name: ${{ matrix.app }}-${{ matrix.suffix }}
         path: bin
+        compression-level: 6
 
   release:
     needs: build
