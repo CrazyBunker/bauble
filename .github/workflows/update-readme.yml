@@ -64,7 +64,7 @@ jobs:
           echo "" >> README.md
           echo "---" >> README.md
           echo "*Last auto-updated: $(date)*" >> README.md
-
+          cat README.md
       - name: Commit changes if modified
         run: |
           git config --local user.email "action@github.com"
