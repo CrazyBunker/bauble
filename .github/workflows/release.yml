@@ -42,17 +42,16 @@ jobs:
       run: |
         make ${{ matrix.app }} ext=${{ matrix.ext }}
     
-    - name: Create distribution directory
-      run: mkdir -p dist
-
     - name: Package binary (Linux/macOS)
       if: matrix.os != 'windows-latest'
       run: |
+        mkdir -p dist
         tar -czf "dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive }}" -C "bin" "${{ matrix.app }}${{ matrix.ext }}"
 
     - name: Package binary (Windows)
       if: matrix.os == 'windows-latest'
       run: |
+        New-Item -ItemType Directory -Path "dist" -Force
         Compress-Archive -Path "bin/${{ matrix.app }}${{ matrix.ext }}" -DestinationPath "dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive }}"
 
     - name: Upload artifact
