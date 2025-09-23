@@ -44,6 +44,7 @@ jobs:
     
     - name: Package binary
       run: |
+        mkdir -p dist
         if [ "${{ matrix.os }}" == "windows-latest" ]; then
           # Для Windows
           Compress-Archive -Path "bin/${{ matrix.app }}${{ matrix.ext }}" -DestinationPath "dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive }}"
