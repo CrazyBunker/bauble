@@ -45,7 +45,7 @@ jobs:
     - name: Compress binaries
       run: |
         mkdir -p dist
-        if [[ ${{ matrix.os }} == "windows-latest" ]]; then
+        if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             Compress-Archive -Path bin/${{ matrix.app }} -DestinationPath dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive}}
         else
             tar -czf dist/${{ matrix.app }}-${{ matrix.suffix }}.${{ matrix.archive}} bin/${{ matrix.app }}
