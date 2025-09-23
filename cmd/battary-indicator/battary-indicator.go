@@ -185,7 +185,7 @@ func main() {
 	flag.Parse()
 
 	if *helpFlag {
-		fmt.Println("Использование: adb-battery [-o genmon|bash] [-h]")
+		fmt.Println("Использование: battery-indicator [-o genmon|bash] [-h]")
 		fmt.Println("  -o genmon   Вывод в формате Xfce genmon (по умолчанию)")
 		fmt.Println("  -o bash     Вывод в формате для терминала с цветами")
 		fmt.Println("  -h          Показать эту справку")
