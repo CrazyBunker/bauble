@@ -196,7 +196,7 @@ func main() {
 	if *outputFlag != "genmon" && *outputFlag != "bash" {
 		fmt.Printf("Ошибка: неверное значение для -o: %s\n", *outputFlag)
 		fmt.Println("Допустимые значения: genmon, bash")
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	// Получаем данные о батарее
@@ -208,7 +208,7 @@ func main() {
 		} else {
 			fmt.Printf("Ошибка: %v\n", err)
 		}
-		os.Exit(1)
+		os.Exit(0)
 	}
 
 	// Выводим в зависимости от выбранного режима
