@@ -9,4 +9,4 @@ release:
 	git tag -a v$(v) -m "Release $(v)"
 	git push origin v$(v)
 
-all: battary-indicator yarurf-balance-checker
+all: battary-indicator yarurf-balance-checker mksquashfs-ui
