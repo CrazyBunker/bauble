@@ -11,6 +11,7 @@ import (
 	"os"
 	"time"
 
+	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,7 +27,15 @@ type Config struct {
 		LowBalance  string `yaml:"low_balance"`
 	} `yaml:"templates"`
 
-	Trigger float64 `yaml:"trigger"`
+	Cost   float64 `yaml:"cost"`
+	Notify struct {
+		TelegramToken string  `yaml:"bot_token"`
+		TelegramChat  []int64 `yaml:"chat"`
+		Time          struct {
+			Hour   int `yaml:"hour"`   // Час (0-23)
+			Minute int `yaml:"minute"` // Минута (0-59)
+		} `yaml:"time"`
+	} `yaml:"notify"`
 }
 
 type AuthRequest struct {
@@ -115,17 +124,75 @@ func getBalance() (*BalanceResponse, error) {
 
 	return &balance, nil
 }
+func (c *Config) IsNotifyTime() bool {
+	now := time.Now()
+	currentHour := now.Hour()
+	currentMinute := now.Minute()
+
+	// Проверяем совпадение часа
+	if currentHour != c.Notify.Time.Hour {
+		return false
+	}
+
+	// Проверяем, что находимся в пределах часа от указанного времени
+	return currentMinute >= c.Notify.Time.Minute && currentMinute < c.Notify.Time.Minute+60
+}
 
 func printBalance(balance float64, config Config) {
 	var template string
+	daysLeft := int(balance / config.Cost)
+	var urgency string
+	if daysLeft <= 1 {
+		urgency = "🔴 СРОЧНО"
+	} else if daysLeft <= 3 {
+		urgency = "🟠 СРОЧНО"
+	} else {
+		urgency = "🟡 ВНИМАНИЕ"
+	}
 
-	if balance > config.Trigger {
+	if daysLeft > 3 {
 		template = config.Templates.HighBalance
 	} else {
 		template = config.Templates.LowBalance
+		if config.IsNotifyTime() {
+			currentBalance := fmt.Sprintf("%.2f руб.", balance)
+			message := fmt.Sprintf(
+				"%s *Низкий баланс интернета*\n\n"+
+					"💳 Баланс: %s\n"+
+					"📅 Пополните за: %d дн.\n"+
+					"📆 Расчет: %.2f ÷ %.2f = %d дн.\n\n"+
+					"⚡ Не забудьте пополнить счет!",
+				urgency,
+				currentBalance,
+				daysLeft,
+				balance,
+				config.Cost,
+				daysLeft,
+			)
+			for _, chat := range config.Notify.TelegramChat {
+				SendTelegramMessage(config.Notify.TelegramToken, chat, message, "")
+			}
+		}
+	}
+	fmt.Printf(template+"\n", balance)
+}
+
+func SendTelegramMessage(token string, chatID int64, message string, parseMode string) error {
+	// Инициализация бота
+	bot, err := tgbotapi.NewBotAPI(token)
+	if err != nil {
+		return err
 	}
 
-	fmt.Printf(template+"\n", balance)
+	// Создание конфигурации сообщения
+	msg := tgbotapi.NewMessage(chatID, message)
+	if parseMode != "" {
+		msg.ParseMode = parseMode
+	}
+
+	// Отправка сообщения
+	_, err = bot.Send(msg)
+	return err
 }
 
 func main() {
