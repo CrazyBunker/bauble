@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // BatteryInfo структура для хранения информации о батарее
@@ -28,7 +30,7 @@ const (
 
 // Цветовые коды в формате HEX для genmon
 const (
-	ColorGenmonDarkGreen  = "#006400" // темно-зеленый
+	ColorGenmonDarkGreen  = "#32a8a2" // темно-зеленый
 	ColorGenmonLightGreen = "#32CD32" // светло-зеленый
 	ColorGenmonYellow     = "#FFD700" // желтый
 	ColorGenmonRed        = "#FF0000" // красный
@@ -122,10 +124,21 @@ func getBatteryColor(info *BatteryInfo, outputMode string) string {
 
 // getBatteryData выполняет ADB-команду и возвращает структуру с данными
 func getBatteryData() (*BatteryInfo, error) {
-	cmd := exec.Command("adb", "shell", "dumpsys", "battery")
+	// Создаем контекст с таймаутом 30 секунд
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel() // Важно: освобождаем ресурсы
+
+	// Создаем команду с контекстом
+	cmd := exec.CommandContext(ctx, "adb", "shell", "dumpsys", "battery")
+
+	// Выполняем команду и получаем вывод
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("ошибка выполнения ADB-команды: %v", err)
+		// Проверяем, не вызвана ли ошибка таймаутом
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, fmt.Errorf("команда adb превысила таймаут 5 секунд: %w", err)
+		}
+		return nil, fmt.Errorf("ошибка выполнения adb: %w", err)
 	}
 
 	return parseBatteryData(string(output))
@@ -189,14 +202,14 @@ func main() {
 		fmt.Println("  -o genmon   Вывод в формате Xfce genmon (по умолчанию)")
 		fmt.Println("  -o bash     Вывод в формате для терминала с цветами")
 		fmt.Println("  -h          Показать эту справку")
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	// Проверяем допустимые значения для -o
 	if *outputFlag != "genmon" && *outputFlag != "bash" {
 		fmt.Printf("Ошибка: неверное значение для -o: %s\n", *outputFlag)
 		fmt.Println("Допустимые значения: genmon, bash")
-		os.Exit(0)
+		os.Exit(1)
 	}
 
 	// Получаем данные о батарее
@@ -208,13 +221,13 @@ func main() {
 		} else {
 			fmt.Printf("Ошибка: %v\n", err)
 		}
-		os.Exit(0)
+		os.Exit(1)
 	}
-
 	// Выводим в зависимости от выбранного режима
 	if *outputFlag == "genmon" {
 		outputGenmon(info)
 	} else {
 		outputBash(info)
 	}
+	os.Exit(0)
 }
