@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/cookiejar"
 	"os"
@@ -53,16 +54,29 @@ var (
 )
 
 func init() {
-	// Инициализация HTTP клиента
-	jar, _ := cookiejar.New(nil)
-	client = &http.Client{
-		Jar:     jar,
-		Timeout: 10 * time.Second,
-	}
-
 	// Регистрация флага для пути к конфигу
 	flag.StringVar(&configPath, "config", "config.yaml", "Path to config file")
 	flag.Parse()
+
+	// Инициализация HTTP клиента с правильным таймаутом
+	jar, _ := cookiejar.New(nil)
+
+	transport := &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   10 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+
+	client = &http.Client{
+		Jar:       jar,
+		Transport: transport,
+		Timeout:   30 * time.Second,
+	}
 }
 
 func loadConfig(path string) (*Config, error) {
