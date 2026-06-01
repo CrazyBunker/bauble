@@ -1,2 +1,5 @@
 bin/*
 !bin/.keep
+.continue
+cmd/beeline-balance-checker/*
+cmd/consumption/*
