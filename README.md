@@ -8,4 +8,4 @@ This project contains the following applications:
 | `yarurf-balance-checker` | Программа для проверки баланса через API yarurf.ru | [README](cmd/yarurf-balance-checker//README.md) |
 
 ---
-*Last auto-updated: Thu Nov  6 09:12:30 UTC 2025*
+*Last auto-updated: Mon Jun  1 13:42:17 UTC 2026*
