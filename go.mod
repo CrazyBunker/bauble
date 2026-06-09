@@ -10,6 +10,12 @@ require (
 )
 
 require (
+	github.com/jwdev42/cookiefile v0.1.4 // indirect
+	github.com/mattn/go-sqlite3 v1.14.45 // indirect
+	golang.org/x/net v0.33.0 // indirect
+)
+
+require (
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
