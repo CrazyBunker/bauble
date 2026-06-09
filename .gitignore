@@ -1,5 +1,7 @@
 bin/*
 !bin/.keep
 .continue
+.kilo
 cmd/beeline-balance-checker/*
 cmd/consumption/*
+*.out

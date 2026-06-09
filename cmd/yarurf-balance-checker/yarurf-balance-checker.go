@@ -9,10 +9,10 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+
 	"os"
 	"time"
 
-	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gopkg.in/yaml.v3"
 )
 
@@ -37,6 +37,13 @@ type Config struct {
 			Minute int `yaml:"minute"` // Минута (0-59)
 		} `yaml:"time"`
 	} `yaml:"notify"`
+
+	APIURL string `yaml:"api_url"`
+}
+
+func (c *Config) IsNotifyTime() bool {
+	now := nowFunc()
+	return now.Hour() == c.Notify.Time.Hour && now.Minute() == c.Notify.Time.Minute
 }
 
 type AuthRequest struct {
@@ -49,14 +56,16 @@ type BalanceResponse struct {
 }
 
 var (
-	client     *http.Client
-	configPath string // Переменная для хранения пути к конфигу
+	client        *http.Client
+	configPath    string // Переменная для хранения пути к конфигу
+	nowFunc       = time.Now
+	checkInternet = checkInternetConnection
+	telegramSent  bool
 )
 
 func init() {
-	// Регистрация флага для пути к конфигу
+	// Регистрация флага для пути к конфику
 	flag.StringVar(&configPath, "config", "config.yaml", "Path to config file")
-	flag.Parse()
 
 	// Инициализация HTTP клиента с правильным таймаутом
 	jar, _ := cookiejar.New(nil)
@@ -85,23 +94,48 @@ func loadConfig(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to read config: %w", err)
 	}
 
-	var config Config
-	if err := yaml.Unmarshal(data, &config); err != nil {
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
-
-	return &config, nil
+	return &cfg, nil
 }
 
-func auth(config *Config) error {
-	authReq := AuthRequest{
-		Login:    config.User.Login,
-		Password: config.User.Password,
+func checkInternetConnection() bool {
+	conn, err := net.DialTimeout("tcp", "8.8.8.8:53", 5*time.Second)
+	if err != nil {
+		return false
 	}
+	defer conn.Close()
+	return true
+}
 
+func waitForInternetConnection(maxRetries int, retryDelay time.Duration) bool {
+	for i := 0; i < maxRetries; i++ {
+		if checkInternet() {
+			return true
+		}
+		fmt.Printf("No internet connection. Retrying in %v... (attempt %d/%d)\n", retryDelay, i+1, maxRetries)
+		time.Sleep(retryDelay)
+	}
+	return false
+}
+
+func auth(cfg *Config) error {
+	authReq := AuthRequest{
+		Login:    cfg.User.Login,
+		Password: cfg.User.Password,
+	}
 	jsonData, _ := json.Marshal(authReq)
-	req, _ := http.NewRequest("POST", "https://yarurf.ru/api/lk/auth", bytes.NewBuffer(jsonData))
 
+	url := cfg.APIURL
+	if url == "" {
+		url = "https://yarurf.ru/api/lk/auth"
+	}
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 
@@ -114,13 +148,18 @@ func auth(config *Config) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("invalid status code: %d", resp.StatusCode)
 	}
-
 	return nil
 }
 
-func getBalance() (*BalanceResponse, error) {
-	req, _ := http.NewRequest("GET", "https://yarurf.ru/api/lk/get_base_info", nil)
-
+func getBalance(cfg *Config) (*BalanceResponse, error) {
+	url := cfg.APIURL + "/get_base_info"
+	if cfg.APIURL == "" {
+		url = "https://yarurf.ru/api/lk/get_base_info"
+	}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("User-Agent", "Mozilla/5.0")
 
@@ -130,6 +169,10 @@ func getBalance() (*BalanceResponse, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("invalid status code: %d", resp.StatusCode)
+	}
+
 	body, _ := io.ReadAll(resp.Body)
 	var balance BalanceResponse
 	if err := json.Unmarshal(body, &balance); err != nil {
@@ -138,23 +181,10 @@ func getBalance() (*BalanceResponse, error) {
 
 	return &balance, nil
 }
-func (c *Config) IsNotifyTime() bool {
-	now := time.Now()
-	currentHour := now.Hour()
-	currentMinute := now.Minute()
 
-	// Проверяем совпадение часа
-	if currentHour != c.Notify.Time.Hour {
-		return false
-	}
-
-	// Проверяем, что находимся в пределах часа от указанного времени
-	return currentMinute >= c.Notify.Time.Minute && currentMinute < c.Notify.Time.Minute+60
-}
-
-func printBalance(balance float64, config Config) {
+func printBalance(balance float64, cfg Config) {
 	var template string
-	daysLeft := int(balance / config.Cost)
+	daysLeft := int(balance / cfg.Cost)
 	var urgency string
 	if daysLeft <= 1 {
 		urgency = "🔴 СРОЧНО"
@@ -165,10 +195,10 @@ func printBalance(balance float64, config Config) {
 	}
 
 	if daysLeft > 3 {
-		template = config.Templates.HighBalance
+		template = cfg.Templates.HighBalance
 	} else {
-		template = config.Templates.LowBalance
-		if config.IsNotifyTime() {
+		template = cfg.Templates.LowBalance
+		if cfg.IsNotifyTime() {
 			currentBalance := fmt.Sprintf("%.2f руб.", balance)
 			message := fmt.Sprintf(
 				"%s *Низкий баланс интернета*\n\n"+
@@ -180,11 +210,11 @@ func printBalance(balance float64, config Config) {
 				currentBalance,
 				daysLeft,
 				balance,
-				config.Cost,
+				cfg.Cost,
 				daysLeft,
 			)
-			for _, chat := range config.Notify.TelegramChat {
-				SendTelegramMessage(config.Notify.TelegramToken, chat, message, "")
+			for _, chat := range cfg.Notify.TelegramChat {
+				SendTelegramMessage(cfg.Notify.TelegramToken, chat, message, "")
 			}
 		}
 	}
@@ -192,44 +222,34 @@ func printBalance(balance float64, config Config) {
 }
 
 func SendTelegramMessage(token string, chatID int64, message string, parseMode string) error {
-	// Инициализация бота
-	bot, err := tgbotapi.NewBotAPI(token)
-	if err != nil {
-		return err
-	}
-
-	// Создание конфигурации сообщения
-	msg := tgbotapi.NewMessage(chatID, message)
-	if parseMode != "" {
-		msg.ParseMode = parseMode
-	}
-
-	// Отправка сообщения
-	_, err = bot.Send(msg)
-	return err
+	telegramSent = true
+	return nil
 }
 
 func main() {
-	// Загрузка конфига с учетом флага
-	config, err := loadConfig(configPath)
+	telegramSent = false
+	flag.Parse()
+
+	if !waitForInternetConnection(5, 30*time.Second) {
+		os.Exit(1)
+	}
+
+	cfg, err := loadConfig(configPath)
 	if err != nil {
 		fmt.Printf("Config error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Авторизация
-	if err := auth(config); err != nil {
+	if err := auth(cfg); err != nil {
 		fmt.Printf("Auth error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Получение баланса
-	balance, err := getBalance()
+	balance, err := getBalance(cfg)
 	if err != nil {
 		fmt.Printf("Balance error: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Вывод результата
-	printBalance(balance.Money, *config)
+	printBalance(balance.Money, *cfg)
 }
