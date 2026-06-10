@@ -8,4 +8,4 @@ This project contains the following applications:
 | `yarurf-balance-checker` | Приложение для контроля баланса на yarurf.ru с уведомлениями Telegram. | [README](cmd/yarurf-balance-checker//README.md) |
 
 ---
-*Last auto-updated: Wed Jun 10 19:44:29 UTC 2026*
+*Last auto-updated: Wed Jun 10 20:50:16 UTC 2026*
